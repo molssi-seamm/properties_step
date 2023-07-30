@@ -32,8 +32,8 @@ class PropertiesStep(object):
     """
 
     my_description = {
-        "description": "An interface for Properties",
-        "group": "Simulations",
+        "description": "An interface for properties in the database",
+        "group": "Data",
         "name": "Properties",
     }
 

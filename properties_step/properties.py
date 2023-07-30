@@ -3,10 +3,14 @@
 """Non-graphical part of the Properties step in a SEAMM flowchart
 """
 
+import fnmatch
 import logging
 from pathlib import Path
 import pkg_resources
 import pprint  # noqa: F401
+
+import numpy as np
+import pandas
 
 import properties_step
 import molsystem
@@ -60,11 +64,7 @@ class Properties(seamm.Node):
     """
 
     def __init__(
-        self,
-        flowchart=None,
-        title="Properties",
-        extension=None,
-        logger=logger
+        self, flowchart=None, title="Properties", extension=None, logger=logger
     ):
         """A step for Properties in a SEAMM flowchart.
 
@@ -128,10 +128,21 @@ class Properties(seamm.Node):
         if not P:
             P = self.parameters.values_to_dict()
 
-        text = (
-            "Please replace this with a short summary of the "
-            "Properties step, including key parameters."
-        )
+        method = P["method"]
+        if self.is_expr(method):
+            text = (
+                "The variable {method} will determine what to do with the properties. "
+                "The other parameters are:"
+            )
+            for key, value in P:
+                if key != "method":
+                    text.append(f"\n    {key}: {value}")
+        elif method == "export to table":
+            text = (
+                "Exporting properties from {target} to the table {table}. "
+                "The {target} names must match {pattern}, and the properties "
+                "matching {properties} will be extracted."
+            )
 
         return self.header + "\n" + __(text, **P, indent=4 * " ").__str__()
 
@@ -152,6 +163,8 @@ class Properties(seamm.Node):
         P = self.parameters.current_values_to_dict(
             context=seamm.flowchart_variables._data
         )
+        for key in ("pattern", "properties"):
+            P[key] = P[key].strip("[]").split(",")
 
         # Print what we are doing
         printer.important(__(self.description_text(P), indent=self.indent))
@@ -160,33 +173,18 @@ class Properties(seamm.Node):
         directory.mkdir(parents=True, exist_ok=True)
 
         # Get the current system and configuration (ignoring the system...)
-        _, configuration = self.get_system_configuration(None)
+        # _, configuration = self.get_system_configuration(None)
 
-        # Results data
-        data = {}
+        text = None
+        method = P["method"]
+        if method == "export to table":
+            text = self.export_to_table(P)
+        else:
+            raise RuntimeError(f"Cannot handle '{method}' for the properties")
 
-        # Temporary code just to print the parameters. You will need to change
-        # this!
-        for key in P:
-            print("{:>15s} = {}".format(key, P[key]))
-            printer.normal(
-                __(
-                    "{key:>15s} = {value}",
-                    key=key,
-                    value=P[key],
-                    indent=4 * " ",
-                    wrap=False,
-                    dedent=False,
-                )
-            )
+        if text is not None:
+            printer.important(__(text, indent=self.indent + 4 * " "))
 
-        # Analyze the results
-        self.analyze()
-        # Put any requested results into variables or tables
-        self.store_results(
-            configuration=configuration,
-            data=data,
-        )
         # Add other citations here or in the appropriate place in the code.
         # Add the bibtex to data/references.bib, and add a self.reference.cite
         # similar to the above to actually add the citation to the references.
@@ -212,3 +210,124 @@ class Properties(seamm.Node):
                 dedent=False,
             )
         )
+
+    def export_to_table(self, P):
+        """Export the selected properties to the table given.
+
+        Parameters
+        ----------
+        P : dict
+            The control parameters
+        """
+        system_db = self.get_variable("_system_db")
+        db_properties = system_db.properties
+
+        # Create the table if needed
+        tablename = P["table"]
+        if not self.variable_exists(tablename):
+            self.set_variable(
+                tablename,
+                {
+                    "type": "pandas",
+                    "table": pandas.DataFrame(),
+                    "defaults": {},
+                    "loop index": False,
+                    "current index": 0,
+                    "index column": None,
+                },
+            )
+        table_handle = self.get_variable(tablename)
+        table = table_handle["table"]
+
+        # Get the properties.
+        target_type = P["target"]
+        pattern = P["pattern"]
+        properties = P["properties"]
+
+        if target_type == "systems":
+            targets = system_db.get_systems(pattern)
+            if "System" not in table.columns:
+                table_handle["defaults"]["System"] = ""
+                table["System"] = ""
+        else:
+            targets = system_db.get_configurations(pattern)
+            if "System" not in table.columns:
+                table_handle["defaults"]["System"] = ""
+                table["System"] = ""
+            if "Configuration" not in table.columns:
+                table_handle["defaults"]["Configuration"] = ""
+                table["Configuration"] = ""
+
+        row_index = table_handle["current index"]
+        for target in targets:
+            row = {}
+            if target_type == "systems":
+                row["System"] = target.name
+            else:
+                row["Configuration"] = target.name
+                row["System"] = target.system.name
+            for prop, value in target.properties.get().items():
+                for tmp in properties:
+                    if fnmatch.fnmatch(prop, tmp):
+                        units = db_properties.units(prop)
+                        column = prop
+                        if column not in table.columns:
+                            if units is not None:
+                                column += f" ({units})"
+                        if column not in table.columns:
+                            kind = db_properties.type(prop)
+                            if isinstance(value, list):
+                                kind = "json"
+                                default = ""
+                            else:
+                                if kind == "boolean":
+                                    default = False
+                                elif kind == "integer":
+                                    default = 0
+                                elif kind == "float":
+                                    default = np.nan
+                                else:
+                                    default = ""
+                            table_handle["defaults"][column] = default
+                            table[column] = default
+                        row[column] = [value]
+                        break
+            new_row = pandas.DataFrame.from_dict(row)
+            table = pandas.concat([table, new_row], ignore_index=True)
+            row_index += 1
+        table_handle["table"] = table
+        table_handle["current index"] = table.shape[0] - 1
+
+        # Save the table!
+        if "filename" not in table_handle:
+            path = Path(self.flowchart.root_directory) / (tablename + ".csv")
+            table_handle["filename"] = str(path)
+        path = Path(table_handle["filename"])
+        file_type = path.suffix
+        filename = str(path)
+
+        index = table_handle["index column"]
+        if file_type == ".csv":
+            if index is None:
+                table.to_csv(filename, index=False)
+            else:
+                table.to_csv(filename, index=True, header=True)
+        elif file_type == ".json":
+            if index is None:
+                table.to_json(filename, indent=4, orient="table", index=False)
+            else:
+                table.to_json(filename, indent=4, orient="table", index=True)
+        elif file_type == ".xlsx":
+            if index is None:
+                table.to_excel(filename, index=False)
+            else:
+                table.to_excel(filename, index=True)
+        elif file_type == ".txt":
+            with open(filename, "w") as fd:
+                if index is None:
+                    fd.write(table.to_string(header=True, index=False))
+                else:
+                    fd.write(table.to_string(header=True, index=True))
+
+        text = f"Wrote {len(targets)} rows to the table and saved it as {filename}"
+        return text

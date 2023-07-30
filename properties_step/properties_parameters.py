@@ -5,7 +5,6 @@ Control parameters for the Properties step in a SEAMM flowchart
 
 import logging
 import seamm
-import pprint  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -74,25 +73,60 @@ class PropertiesParameters(seamm.Parameters):
     """
 
     parameters = {
-        "time": {
-            "default": 100.0,
-            "kind": "float",
-            "default_units": "ps",
-            "enumeration": tuple(),
-            "format_string": ".1f",
-            "description": "Simulation time:",
-            "help_text": ("The time to simulate in the dynamics run."),
+        "method": {
+            "default": "export to table",
+            "kind": "enumeration",
+            "default_units": "",
+            "enumeration": (
+                "export to table",
+                "append row to table",
+                "add to current row of table",
+            ),
+            "format_string": "s",
+            "description": "What to do:",
+            "help_text": "What to do with the properties",
         },
-        # # Results handling ... uncomment if needed
-        # "results": {
-        #     "default": {},
-        #     "kind": "dictionary",
-        #     "default_units": "",
-        #     "enumeration": tuple(),
-        #     "format_string": "",
-        #     "description": "results",
-        #     "help_text": "The results to save to variables or in tables.",
-        # },
+        "target": {
+            "default": "configurations",
+            "kind": "enumeration",
+            "default_units": "",
+            "enumeration": (
+                "configurations",
+                "systems",
+            ),
+            "format_string": "s",
+            "description": "Properties of:",
+            "help_text": "What to do with the properties",
+        },
+        "pattern": {
+            "default": "[*]",
+            "kind": "list",
+            "default_units": "",
+            "enumeration": ("[*]"),
+            "format_string": "",
+            "description": "With name matching (list):",
+            "help_text": (
+                "A list of glob-style patterns for selecting systems or configurations."
+            ),
+        },
+        "properties": {
+            "default": "[*]",
+            "kind": "list",
+            "default_units": "",
+            "enumeration": ("[*]",),
+            "format_string": "",
+            "description": "Properties matching (list):",
+            "help_text": "A list of glob-style patterns for matching the properties.",
+        },
+        "table": {
+            "default": "properties",
+            "kind": "string",
+            "default_units": "",
+            "enumeration": tuple(),
+            "format_string": "",
+            "description": "Table:",
+            "help_text": "The name of the table.",
+        },
     }
 
     def __init__(self, defaults={}, data=None):

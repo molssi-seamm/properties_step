@@ -78,10 +78,10 @@ setup(
     ],
     entry_points={
         'org.molssi.seamm': [
-            'Properties = properties_step:PropertiesStep',
+            'DB Properties = properties_step:PropertiesStep',
         ],
         'org.molssi.seamm.tk': [
-            'Properties = properties_step:PropertiesStep',
+            'DB Properties = properties_step:PropertiesStep',
         ],
     }
 )
