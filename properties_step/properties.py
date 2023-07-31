@@ -262,10 +262,10 @@ class Properties(seamm.Node):
         for target in targets:
             row = {}
             if target_type == "systems":
-                row["System"] = target.name
+                row["System"] = [target.name]
             else:
-                row["Configuration"] = target.name
-                row["System"] = target.system.name
+                row["Configuration"] = [target.name]
+                row["System"] = [target.system.name]
             for prop, value in target.properties.get().items():
                 for tmp in properties:
                     if fnmatch.fnmatch(prop, tmp):
