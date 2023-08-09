@@ -1,0 +1,53 @@
+properties\_step package
+========================
+
+Submodules
+----------
+
+properties\_step.metadata module
+--------------------------------
+
+.. automodule:: properties_step.metadata
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+properties\_step.properties module
+----------------------------------
+
+.. automodule:: properties_step.properties
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+properties\_step.properties\_parameters module
+----------------------------------------------
+
+.. automodule:: properties_step.properties_parameters
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+properties\_step.properties\_step module
+----------------------------------------
+
+.. automodule:: properties_step.properties_step
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+properties\_step.tk\_properties module
+--------------------------------------
+
+.. automodule:: properties_step.tk_properties
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: properties_step
+   :members:
+   :undoc-members:
+   :show-inheritance:
