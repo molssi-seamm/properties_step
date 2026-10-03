@@ -254,20 +254,23 @@ class Properties(seamm.Node):
                             if units is not None:
                                 column += f" ({units})"
                         if column not in table.columns:
+                            # The database's property types are int, float,
+                            # str and json.
                             kind = db_properties.type(prop)
-                            if isinstance(value, list):
+                            if isinstance(value, list) or kind == "json":
                                 kind = "json"
                                 default = ""
+                            elif kind in ("int", "integer"):
+                                kind = "integer"
+                                default = 0
+                            elif kind == "float":
+                                default = np.nan
+                            elif kind in ("bool", "boolean"):
+                                kind = "boolean"
+                                default = False
                             else:
-                                if kind == "boolean":
-                                    default = False
-                                elif kind == "integer":
-                                    default = 0
-                                elif kind == "float":
-                                    default = np.nan
-                                else:
-                                    kind = "string"
-                                    default = ""
+                                kind = "string"
+                                default = ""
                             table.add_column(column, kind, default)
                         row[column] = value
                         break
