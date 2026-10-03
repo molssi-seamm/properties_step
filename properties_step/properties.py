@@ -246,6 +246,9 @@ class Properties(seamm.Node):
                 row["Configuration"] = target.name
                 row["System"] = target.system.name
             for prop, value in target.properties.get().items():
+                # The properties come as {"sid": ..., "cid": ..., "value": ...}
+                if isinstance(value, dict) and "value" in value:
+                    value = value["value"]
                 for tmp in properties:
                     if fnmatch.fnmatch(prop, tmp):
                         units = db_properties.units(prop)
