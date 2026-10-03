@@ -9,7 +9,6 @@ from pathlib import Path
 import pprint  # noqa: F401
 
 import numpy as np
-import pandas
 
 import properties_step
 import molsystem
@@ -223,20 +222,7 @@ class Properties(seamm.Node):
 
         # Create the table if needed
         tablename = P["table"]
-        if not self.variable_exists(tablename):
-            self.set_variable(
-                tablename,
-                {
-                    "type": "pandas",
-                    "table": pandas.DataFrame(),
-                    "defaults": {},
-                    "loop index": False,
-                    "current index": 0,
-                    "index column": None,
-                },
-            )
-        table_handle = self.get_variable(tablename)
-        table = table_handle["table"]
+        table = self.get_table(tablename)
 
         # Get the properties.
         target_type = P["target"]
@@ -245,27 +231,24 @@ class Properties(seamm.Node):
 
         if target_type == "systems":
             targets = system_db.get_systems(pattern)
-            if "System" not in table.columns:
-                table_handle["defaults"]["System"] = ""
-                table["System"] = ""
+            table.add_column("System", "string", "")
         else:
             targets = system_db.get_configurations(pattern)
-            if "System" not in table.columns:
-                table_handle["defaults"]["System"] = ""
-                table["System"] = ""
-            if "Configuration" not in table.columns:
-                table_handle["defaults"]["Configuration"] = ""
-                table["Configuration"] = ""
+            table.add_column("System", "string", "")
+            table.add_column("Configuration", "string", "")
 
-        row_index = table_handle["current index"]
+        rows = []
         for target in targets:
             row = {}
             if target_type == "systems":
-                row["System"] = [target.name]
+                row["System"] = target.name
             else:
-                row["Configuration"] = [target.name]
-                row["System"] = [target.system.name]
+                row["Configuration"] = target.name
+                row["System"] = target.system.name
             for prop, value in target.properties.get().items():
+                # The properties come as {"sid": ..., "cid": ..., "value": ...}
+                if isinstance(value, dict) and "value" in value:
+                    value = value["value"]
                 for tmp in properties:
                     if fnmatch.fnmatch(prop, tmp):
                         units = db_properties.units(prop)
@@ -274,59 +257,37 @@ class Properties(seamm.Node):
                             if units is not None:
                                 column += f" ({units})"
                         if column not in table.columns:
+                            # The database's property types are int, float,
+                            # str and json.
                             kind = db_properties.type(prop)
-                            if isinstance(value, list):
+                            if isinstance(value, list) or kind == "json":
                                 kind = "json"
                                 default = ""
+                            elif kind in ("int", "integer"):
+                                kind = "integer"
+                                default = 0
+                            elif kind == "float":
+                                default = np.nan
+                            elif kind in ("bool", "boolean"):
+                                kind = "boolean"
+                                default = False
                             else:
-                                if kind == "boolean":
-                                    default = False
-                                elif kind == "integer":
-                                    default = 0
-                                elif kind == "float":
-                                    default = np.nan
-                                else:
-                                    default = ""
-                            table_handle["defaults"][column] = default
-                            table[column] = default
-                        row[column] = [value]
+                                kind = "string"
+                                default = ""
+                            table.add_column(column, kind, default)
+                        row[column] = value
                         break
-            new_row = pandas.DataFrame.from_dict(row)
-            table = pandas.concat([table, new_row], ignore_index=True)
-            row_index += 1
-        table_handle["table"] = table
-        table_handle["current index"] = table.shape[0] - 1
+            rows.append(row)
+        table.append_rows(rows)
 
         # Save the table!
-        if "filename" not in table_handle:
-            path = Path(self.flowchart.root_directory) / (tablename + ".csv")
-            table_handle["filename"] = str(path)
-        path = Path(table_handle["filename"])
-        file_type = path.suffix
-        filename = str(path)
-
-        index = table_handle["index column"]
-        if file_type == ".csv":
-            if index is None:
-                table.to_csv(filename, index=False)
-            else:
-                table.to_csv(filename, index=True, header=True)
-        elif file_type == ".json":
-            if index is None:
-                table.to_json(filename, indent=4, orient="table", index=False)
-            else:
-                table.to_json(filename, indent=4, orient="table", index=True)
-        elif file_type == ".xlsx":
-            if index is None:
-                table.to_excel(filename, index=False)
-            else:
-                table.to_excel(filename, index=True)
-        elif file_type == ".txt":
-            with open(filename, "w") as fd:
-                if index is None:
-                    fd.write(table.to_string(header=True, index=False))
-                else:
-                    fd.write(table.to_string(header=True, index=True))
+        filename = table.filename
+        if filename is None:
+            filename = str(Path(self.flowchart.root_directory) / (tablename + ".csv"))
+        if Path(filename).suffix in seamm.table.file_types:
+            table.export(filename)
+        else:
+            table.filename = filename
 
         text = f"Wrote {len(targets)} rows to the table and saved it as {filename}"
         return text
