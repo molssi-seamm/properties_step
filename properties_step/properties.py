@@ -283,7 +283,7 @@ class Properties(seamm.Node):
         # Save the table!
         filename = table.filename
         if filename is None:
-            filename = str(Path(self.flowchart.root_directory) / (tablename + ".csv"))
+            filename = str(self.job_path / (tablename + ".csv"))
         if Path(filename).suffix in seamm.table.file_types:
             table.export(filename)
         else:
