@@ -1,6 +1,11 @@
 =======
 History
 =======
+2026.10.5 -- Job-level files for parallel loops
+    * Files named ``/name`` are written to the job's own directory (``Node.job_path``)
+      and read from it or, in an iteration of a parallel loop (loop_step 2026.10.5),
+      from the enclosing iterations and the job. Nothing changes for other jobs.
+    * Requires seamm 2026.10.5.
 2026.10.3.1 -- Tables in the job's database; property values exported
     * Exports to tables kept in the job's database (seamm 2026.10.3).
     * Bugfix: the table held each property as a record (system, configuration and
